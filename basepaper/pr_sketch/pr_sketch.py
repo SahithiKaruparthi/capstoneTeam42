@@ -1,5 +1,7 @@
 import numpy as np
 import hashlib
+import time
+from time import sleep
 
 class PRSketch:
     def __init__(self, width, depth, pattern_length, conflict_limit=3):
@@ -98,3 +100,26 @@ class PRSketch:
                                 queue.append(pair[1])
         
         return False
+    
+    def stream_edges(self, file_path):
+        """Simulates real-time graph streaming from a dataset."""
+        with open(file_path, 'r') as file:
+            for line in file:
+                if line.startswith("#"):
+                    continue  # Skip comments
+                parts = line.strip().split()
+                if len(parts) == 2:
+                    source, dest = parts[0], parts[1]
+                    self.update(source, dest, weight=1.0)
+                    print(f"Streamed Edge: {source} -> {dest}")
+                    time.sleep(0.05)  # Simulate real-time delay
+
+    def run_queries(self, queries):
+        """Runs queries in parallel while streaming edges."""
+        while True:
+            for (source, dest) in queries:
+                edge_weight = self.edge_query(source, dest)
+                reachability = self.reachability_query(source, dest)
+                print(f"Edge Query ({source} -> {dest}): {edge_weight}")
+                print(f"Reachability Query ({source} -> {dest}): {reachability}")
+            time.sleep(2)
