@@ -1,5 +1,5 @@
 import threading
-from pr_sketch import PRSketch, stream_edges, run_queries
+from basepaper.pr_sketch.pr_sketch import PRSketch, stream_edges, run_queries
 
 if __name__ == "__main__":
     # Define input parameters directly in the script

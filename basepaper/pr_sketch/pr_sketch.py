@@ -1,7 +1,5 @@
 import numpy as np
 import hashlib
-import time
-import threading
 
 class PRSketch:
     def __init__(self, width, depth, pattern_length, conflict_limit=3):
@@ -21,23 +19,29 @@ class PRSketch:
         self.hash_funcs = [lambda x, seed=i: int(hashlib.md5((str(x) + str(seed)).encode()).hexdigest(), 16) % width for i in range(depth)]
 
     def pattern_hash(self, node):
+        """Generate pattern for a node using multiple hash functions."""
         return [h(node) for h in self.hash_funcs]
     
     def rank_hash(self, node):
+        """Generate rank values for a node."""
         np.random.seed(hash(node) % 1000)
         return np.random.permutation(self.pattern_length)
     
     def update(self, source, dest, weight=1.0):
+        """Update the PR-Sketch with a new edge."""
+        source = str(source)
+        dest = str(dest)
+
         src_pattern = self.pattern_hash(source)
         dest_pattern = self.pattern_hash(dest)
         src_rank = self.rank_hash(source)
         dest_rank = self.rank_hash(dest)
-        
+
         for i in range(self.depth):
             x, y = src_pattern[i], dest_pattern[i]
             rank_val = min(src_rank[i], dest_rank[i])
             cell = self.gM[x, y, i]
-            
+
             if rank_val > cell['rank']:
                 cell['rank'] = rank_val
                 cell['weight'] = weight
@@ -49,6 +53,7 @@ class PRSketch:
                     cell['list'].append((source, dest))
     
     def edge_query(self, source, dest):
+        """Estimate the weight of an edge."""
         src_pattern = self.pattern_hash(source)
         dest_pattern = self.pattern_hash(dest)
         src_rank = self.rank_hash(source)
@@ -68,55 +73,28 @@ class PRSketch:
         return min_weight if found else 0.0
     
     def reachability_query(self, source, dest):
+        """Check if there is a reachable path from source to dest."""
+        source = str(source)
+        dest = str(dest)
+        
         visited = set()
         queue = [source]
-        
+
         while queue:
             node = queue.pop(0)
             if node == dest:
                 return True
-            
+
             if node in visited:
                 continue
             visited.add(node)
-            
+
             for i in range(self.depth):
-                neighbors = []
-                for row in self.gM[:, :, i]['list']:
-                    for pair in row:
-                        if len(pair) >= 2 and pair[0] == node:
-                            neighbors.append(pair[1])
-                queue.extend(neighbors)
+                for x in range(self.width):
+                    for y in range(self.width):
+                        cell = self.gM[x, y, i]
+                        for pair in cell['list']:
+                            if len(pair) >= 2 and pair[0] == node:
+                                queue.append(pair[1])
         
         return False
-
-    def load_data(self, file_path):
-        with open(file_path, 'r') as file:
-            for line in file:
-                if line.startswith("#"):
-                    continue
-                parts = line.strip().split()
-                if len(parts) == 2:
-                    source, dest = int(parts[0]), int(parts[1])
-                    self.update(source, dest, weight=1.0)
-
-def stream_edges(file_path, pr_sketch):
-    with open(file_path, 'r') as file:
-        for line in file:
-            if line.startswith("#"):
-                continue
-            parts = line.strip().split()
-            if len(parts) == 2:
-                source, dest = int(parts[0]), int(parts[1])
-                pr_sketch.update(source, dest, weight=1.0)
-                print(f"Streamed Edge: {source} -> {dest}")
-                time.sleep(0.05)
-
-def run_queries(pr_sketch, queries):
-    while True:
-        for (source, dest) in queries:
-            edge_weight = pr_sketch.edge_query(source, dest)
-            reachability = pr_sketch.reachability_query(source, dest)
-            print(f"Edge Query ({source} -> {dest}): {edge_weight}")
-            print(f"Reachability Query ({source} -> {dest}): {reachability}")
-        time.sleep(2)
