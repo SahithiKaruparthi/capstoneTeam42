@@ -5,38 +5,73 @@ from time import sleep
 
 class PRSketch:
     def __init__(self, width, depth, pattern_length, conflict_limit=3):
-        self.width = width  # Width of the hash table
-        self.depth = depth  # Number of hash functions
+        """
+        Initializes the PR-Sketch data structure with given parameters.
+        This involves setting up a three-dimensional matrix to store rank, weight, and conflict lists,
+        ensuring efficient graph compression and query operations. Each cell in the matrix represents
+        a combination of hashed source-destination pairs across multiple hash functions. The rank
+        maintains a hierarchical ordering of node importance, weight tracks edge significance,
+        and the conflict list helps manage hash collisions while preserving data integrity.
+        Randomized hash functions are used for pattern generation, ensuring diverse mappings
+        and reducing chances of hash collisions. Proper initialization of these structures is
+        crucial for the PR-Sketch's ability to approximate graph structures efficiently and
+        handle streaming data effectively.
+        """
+        self.width = width  
+        self.depth = depth  
         self.pattern_length = pattern_length
         self.conflict_limit = conflict_limit
         
-        # 3D hash table storing rank, weight, and conflict list
         self.gM = np.zeros((width, width, depth), dtype=[('rank', 'i4'), ('weight', 'f4'), ('list', 'O')])
         for i in range(width):
             for j in range(width):
                 for k in range(depth):
                     self.gM[i, j, k]['list'] = []
         
-        # Randomized hash functions
         self.hash_funcs = [lambda x, seed=i: int(hashlib.md5((str(x) + str(seed)).encode()).hexdigest(), 16) % width for i in range(depth)]
 
     def pattern_hash(self, node):
-        """Generate pattern for a node using multiple hash functions."""
+        """
+        Generates a hash pattern for the given node using multiple hash functions.
+        The node is passed through several pre-defined hash functions, each returning
+        a unique mapping to ensure a spread across the hash space. This method is
+        crucial for indexing and accessing nodes efficiently within PR-Sketch, helping
+        to balance computational cost and collision avoidance. By distributing nodes
+        in a structured yet randomized manner, this function improves query accuracy
+        and facilitates better compression in the PR-Sketch framework.
+        """
         return [h(node) for h in self.hash_funcs]
     
     def rank_hash(self, node):
-        """Generate rank values for a node."""
+        """
+        Computes a rank permutation for a node, determining its relative importance.
+        This ranking is derived from a seeded random permutation of pattern positions,
+        ensuring a stable but diverse ranking for different nodes. The ranking plays a
+        crucial role in conflict resolution, prioritizing higher-ranked nodes for
+        storage while discarding lower-ranked ones when space constraints arise. This
+        method enhances PR-Sketch's effectiveness by helping to distinguish significant
+        nodes from less important ones in an evolving graph structure.
+        """
         np.random.seed(hash(node) % 1000)
         return np.random.permutation(self.pattern_length)
     
     def update(self, source, dest, weight=1.0):
-        """Update the PR-Sketch with a new edge."""
+        """
+        Updates the PR-Sketch with a new edge between the source and destination nodes.
+        The function first converts the nodes into strings, then generates their pattern
+        hashes and rank values. These values are used to determine where to store the
+        edge in the hash matrix. If the new rank is higher than the existing rank,
+        it replaces the old entry; otherwise, it either accumulates weight or adds the
+        edge to a conflict list. This method enables PR-Sketch to dynamically adjust
+        to incoming graph data while maintaining an efficient representation of the
+        most significant edges.
+        """
         source = str(source)
         dest = str(dest)
 
         src_pattern = self.pattern_hash(source)
         dest_pattern = self.pattern_hash(dest)
-        src_rank = self.rank_hash(source)
+        src_rank = self.rank_hash(source) 
         dest_rank = self.rank_hash(dest)
 
         for i in range(self.depth):
@@ -55,7 +90,15 @@ class PRSketch:
                     cell['list'].append((source, dest))
     
     def edge_query(self, source, dest):
-        """Estimate the weight of an edge."""
+        """
+        Estimates the weight of an edge between the given source and destination.
+        The function uses the stored hash patterns and ranks to look up the edge
+        in the hash matrix. If an exact match is found, it returns the minimum
+        recorded weight. Otherwise, it returns zero, indicating the absence of
+        a strong connection. This query method allows efficient weight estimation
+        without needing the full adjacency list, making it ideal for compressed
+        graph representations.
+        """
         src_pattern = self.pattern_hash(source)
         dest_pattern = self.pattern_hash(dest)
         src_rank = self.rank_hash(source)
@@ -75,7 +118,15 @@ class PRSketch:
         return min_weight if found else 0.0
     
     def reachability_query(self, source, dest):
-        """Check if there is a reachable path from source to dest."""
+        """
+        Checks whether there exists a path from the source node to the destination.
+        This method performs a breadth-first search over the compressed edge lists,
+        exploring reachable nodes until the target is found. It efficiently determines
+        connectivity without requiring explicit storage of all paths, making it well-
+        suited for handling large dynamic graphs. This feature is essential for
+        understanding network structures and detecting potential pathways within
+        PR-Sketch's summarized representation.
+        """
         source = str(source)
         dest = str(dest)
         
@@ -86,11 +137,9 @@ class PRSketch:
             node = queue.pop(0)
             if node == dest:
                 return True
-
             if node in visited:
                 continue
             visited.add(node)
-
             for i in range(self.depth):
                 for x in range(self.width):
                     for y in range(self.width):
@@ -98,9 +147,9 @@ class PRSketch:
                         for pair in cell['list']:
                             if len(pair) >= 2 and pair[0] == node:
                                 queue.append(pair[1])
-        
         return False
     
+            
     def stream_edges(self, file_path):
         """Simulates real-time graph streaming from a dataset."""
         with open(file_path, 'r') as file:
