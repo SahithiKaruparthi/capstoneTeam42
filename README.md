@@ -9,5 +9,3 @@ Adaptive Compression – The system intelligently compresses the graph to optimi
 PR-Sketch Model Foundation – We leverage the Pattern and Rank (PR) Sketch method for summarizing graph streams, improving hash space utilization and query accuracy.
 Efficiency-Driven Design – The compression ensures that the essential structure relevant to the query is retained, while unnecessary details are discarded, leading to faster and more efficient query execution.
 This approach ensures that users can perform complex graph queries with reduced computational overhead while maintaining accuracy and efficiency.
-
-HAHAHAHAHA
